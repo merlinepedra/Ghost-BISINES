@@ -1,25 +1,31 @@
 const debug = require('@tryghost/debug')('web:admin:app');
 const express = require('../../../shared/express');
-const serveStatic = express.static;
 const config = require('../../../shared/config');
-const constants = require('@tryghost/constants');
 const urlUtils = require('../../../shared/url-utils');
 const shared = require('../shared');
 const errorHandler = require('@tryghost/mw-error-handler');
 const sentry = require('../../../shared/sentry');
 const redirectAdminUrls = require('./middleware/redirect-admin-urls');
+const {createProxyMiddleware} = require('http-proxy-middleware');
 
 module.exports = function setupAdminApp() {
     debug('Admin setup start');
     const adminApp = express('admin');
 
+    const unpkgProxy = createProxyMiddleware({
+        target: 'https://unpkg.com/@tryghost/admin',
+        followRedirects: true,
+        changeOrigin: true,
+        pathRewrite: (path) => {
+            return path
+                .replace('/ghost/', '')
+                .replace(/^assets/, 'dist/assets');
+        }
+    });
+
     // Admin assets
-    // @TODO ensure this gets a local 404 error handler
-    const configMaxAge = config.get('caching:admin:maxAge');
-    adminApp.use('/assets', serveStatic(
-        config.get('paths').adminAssets,
-        {maxAge: (configMaxAge || configMaxAge === 0) ? configMaxAge : constants.ONE_YEAR_MS, fallthrough: false}
-    ));
+    // TODO: not ideal, need to rewrite assets in Admin build to use absolute unpkg URLs
+    adminApp.use('/assets', unpkgProxy);
 
     // Ember CLI's live-reload script
     if (config.get('env') === 'development') {
@@ -44,7 +50,7 @@ module.exports = function setupAdminApp() {
     adminApp.use(redirectAdminUrls);
 
     // Finally, routing
-    adminApp.get('*', require('./controller'));
+    adminApp.use('/', unpkgProxy);
 
     adminApp.use((err, req, res, next) => {
         if (err.statusCode && err.statusCode === 404) {

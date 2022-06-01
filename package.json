@@ -146,6 +146,7 @@
     "got": "9.6.0",
     "gscan": "4.31.1",
     "html-to-text": "8.2.0",
+    "http-proxy-middleware": "2.0.6",
     "image-size": "1.0.1",
     "intl": "1.2.5",
     "intl-messageformat": "5.4.3",
